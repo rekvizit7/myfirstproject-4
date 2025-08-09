@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Сапер</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f0f0f0;
+    }
+    h1 {
+      margin-top: 20px;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(10, 30px);
+      grid-gap: 2px;
+      justify-content: center;
+      margin: 20px auto;
+    }
+    .cell {
+      width: 30px;
+      height: 30px;
+      background-color: #ccc;
+      border: 1px solid #999;
+      font-size: 16px;
+      line-height: 30px;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .cell.revealed {
+      background-color: #eee;
+      cursor: default;
+    }
+    .cell.bomb {
+      background-color: red;
+      color: white;
+    }
+    .cell.flag {
+      background-color: orange;
+    }
+    #status {
+      margin: 10px;
+      font-weight: bold;
+    }
+    button {
+      padding: 5px 15px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Сапер</h1>
+  <div id="status">Клікніть на клітинку, щоб почати!</div>
+  <div id="board"></div>
+  <button onclick="initGame()">Перезапустити</button>
+
+  <script>
+    const boardSize = 10;
+    const bombCount = 15;
+    let board = [];
+    let revealed = 0;
+    let gameOver = false;
+
+    function initGame() {
+      const boardElement = document.getElementById('board');
+      const status = document.getElementById('status');
+      boardElement.innerHTML = '';
+      board = [];
+      revealed = 0;
+      gameOver = false;
+      status.textContent = "Гра розпочалась!";
+
+      // Створюємо пусту дошку
+      for (let y = 0; y < boardSize; y++) {
+        board[y] = [];
+        for (let x = 0; x < boardSize; x++) {
+          board[y][x] = {
+            bomb: false,
+            revealed: false,
+            flag: false,
+            count: 0
+          };
+        }
+      }
+
+      // Встановлюємо бомби
+      let placed = 0;
+      while (placed < bombCount) {
+        const x = Math.floor(Math.random() * boardSize);
+        const y = Math.floor(Math.random() * boardSize);
+        if (!board[y][x].bomb) {
+          board[y][x].bomb = true;
+          placed++;
+        }
+      }
+
+      // Розраховуємо числа сусідів
+      for (let y = 0; y < boardSize; y++) {
+        for (let x = 0; x < boardSize; x++) {
+          if (!board[y][x].bomb) {
+            board[y][x].count = countNeighbors(x, y);
+          }
+        }
+      }
+
+      // Створюємо HTML
+      for (let y = 0; y < boardSize; y++) {
+        for (let x = 0; x < boardSize; x++) {
+          const cell = document.createElement('div');
+          cell.classList.add('cell');
+          cell.dataset.x = x;
+          cell.dataset.y = y;
+          cell.oncontextmenu = (e) => {
+            e.preventDefault();
+            toggleFlag(x, y);
+          };
+          cell.onclick = () => revealCell(x, y);
+          boardElement.appendChild(cell);
+        }
+      }
+    }
+
+    function countNeighbors(x, y) {
+      let count = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && nx < boardSize && ny >= 0 && ny < boardSize && board[ny][nx].bomb) {
+            count++;
+          }
+        }
+      }
+      return count;
+    }
+
+    function revealCell(x, y) {
+      if (gameOver || board[y][x].revealed || board[y][x].flag) return;
+      const cell = board[y][x];
+      cell.revealed = true;
+      const cellDiv = getCellDiv(x, y);
+      cellDiv.classList.add('revealed');
+
+      if (cell.bomb) {
+        cellDiv.classList.add('bomb');
+        cellDiv.textContent = '💣';
+        endGame(false);
+        return;
+      }
+
+      revealed++;
+      if (cell.count > 0) {
+        cellDiv.textContent = cell.count;
+      } else {
+        // Розкриваємо сусідів
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < boardSize && ny >= 0 && ny < boardSize) {
+              revealCell(nx, ny);
+            }
+          }
+        }
+      }
+
+      if (revealed === boardSize * boardSize - bombCount) {
+        endGame(true);
+      }
+    }
+
+    function toggleFlag(x, y) {
+      if (gameOver || board[y][x].revealed) return;
+      const cell = board[y][x];
+      const cellDiv = getCellDiv(x, y);
+      cell.flag = !cell.flag;
+      cellDiv.classList.toggle('flag');
+      cellDiv.textContent = cell.flag ? '🚩' : '';
+    }
+
+    function getCellDiv(x, y) {
+      return document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+    }
+
+    function endGame(win) {
+      gameOver = true;
+      const status = document.getElementById('status');
+      if (win) {
+        status.textContent = "Вітаємо! Ви виграли!";
+      } else {
+        status.textContent = "Гру закінчено. Ви натрапили на бомбу.";
+        // Показати всі бомби
+        for (let y = 0; y < boardSize; y++) {
+          for (let x = 0; x < boardSize; x++) {
+            if (board[y][x].bomb) {
+              const cellDiv = getCellDiv(x, y);
+              cellDiv.classList.add('bomb');
+              cellDiv.textContent = '💣';
+            }
+          }
+        }
+      }
+    }
+
+    window.onload = initGame;
+  </script>
+</body>
+</html>
